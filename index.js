@@ -3,38 +3,72 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
-
 const app = express();
+
 app.use(cors());
 app.use(express.json());
-
-const allowedUsers = new Set();
 
 const {
   TWITCH_CLIENT_ID,
   TWITCH_CLIENT_SECRET,
   TWITCH_CALLBACK_URL,
+  TWITCH_USERNAME,
   TWITCH_REWARD_NAME,
   APP_ACCESS_TOKEN
 } = process.env;
 
+const allowedUsers = new Set();
 let broadcasterId = null;
-let rewardId = null;
 
-// Obtener broadcaster ID al iniciar
+// ========= AUTH ==========
+
+// Redirección a Twitch
+app.get("/auth/login", (req, res) => {
+  const scope = "channel:read:redemptions";
+  const redirectUri = TWITCH_CALLBACK_URL;
+  const authUrl = `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${TWITCH_CLIENT_ID}&redirect_uri=${redirectUri}&scope=${scope}`;
+  res.redirect(authUrl);
+});
+
+// Callback de Twitch tras login
+app.get("/twitch/callback", async (req, res) => {
+  const code = req.query.code;
+
+  try {
+    const tokenRes = await axios.post(`https://id.twitch.tv/oauth2/token`, null, {
+      params: {
+        client_id: TWITCH_CLIENT_ID,
+        client_secret: TWITCH_CLIENT_SECRET,
+        code,
+        grant_type: "authorization_code",
+        redirect_uri: TWITCH_CALLBACK_URL
+      }
+    });
+
+    const token = tokenRes.data.access_token;
+    console.log("✅ Token de Twitch recibido");
+    res.send("✅ Token de Twitch recibido. Ya puedes cerrar esta pestaña.");
+
+  } catch (error) {
+    console.error("❌ Error al obtener token de usuario:", error.response?.data || error.message);
+    res.status(500).send("Error al obtener token de usuario");
+  }
+});
+
+// ========= EVENTSUB & BACKEND ==========
+
 async function getBroadcasterId() {
-  const user = await axios.get("https://api.twitch.tv/helix/users", {
+  const res = await axios.get("https://api.twitch.tv/helix/users", {
     headers: {
       "Client-ID": TWITCH_CLIENT_ID,
       Authorization: `Bearer ${APP_ACCESS_TOKEN}`,
     },
-    params: { login: process.env.TWITCH_USERNAME }
+    params: { login: TWITCH_USERNAME }
   });
-  return user.data.data[0]?.id;
+  return res.data.data[0]?.id;
 }
 
-// Crear suscripción a canje de recompensa
-async function createEventSubSubscription(broadcasterId) {
+async function subscribeToEventSub(broadcasterId) {
   await axios.post("https://api.twitch.tv/helix/eventsub/subscriptions", {
     type: "channel.channel_points_custom_reward_redemption.add",
     version: "1",
@@ -44,7 +78,7 @@ async function createEventSubSubscription(broadcasterId) {
     },
     transport: {
       method: "webhook",
-      callback: `${process.env.TWITCH_CALLBACK_URL}`,
+      callback: `${TWITCH_CALLBACK_URL}`,
       secret: "joanmiii-secret"
     }
   }, {
@@ -57,7 +91,7 @@ async function createEventSubSubscription(broadcasterId) {
 }
 
 // Webhook de Twitch
-app.post("/twitch/callback", (req, res) => {
+app.post("/twitch/callback", express.json(), (req, res) => {
   const messageType = req.header("Twitch-Eventsub-Message-Type");
 
   if (messageType === "webhook_callback_verification") {
@@ -76,7 +110,8 @@ app.post("/twitch/callback", (req, res) => {
   res.sendStatus(200);
 });
 
-// Endpoints frontend
+// ========= API para el frontend =========
+
 app.get("/api/allowed/:username", (req, res) => {
   const username = req.params.username.toLowerCase();
   res.json({ allowed: allowedUsers.has(username) });
@@ -88,57 +123,50 @@ app.post("/api/consume/:username", (req, res) => {
   res.sendStatus(200);
 });
 
-// Endpoint para usar sin Twitch (test manual)
 app.post("/api/fake-reward", (req, res) => {
   const { username } = req.body;
   allowedUsers.add(username.toLowerCase());
   res.json({ message: "Permiso otorgado manualmente" });
 });
 
-// TTS de FakeYou
 app.post("/api/tts-fakeyou", async (req, res) => {
   const { voice, message } = req.body;
   try {
-    const sessionResp = await axios.post("https://api.fakeyou.com/tts/inference", {
+    const session = await axios.post("https://api.fakeyou.com/tts/inference", {
       tts_model_token: voice,
       uuid_idempotency_token: Math.random().toString().substring(2),
       inference_text: message
-    }, {
-      headers: {
-        "Content-Type": "application/json"
-      }
     });
 
-    const jobToken = sessionResp.data.inference_job_token;
+    const job = session.data.inference_job_token;
     let audioUrl = null;
 
     for (let i = 0; i < 20; i++) {
-      const check = await axios.get(`https://api.fakeyou.com/tts/job/${jobToken}`);
+      const check = await axios.get(`https://api.fakeyou.com/tts/job/${job}`);
       if (check.data.state.status === "complete_success") {
         audioUrl = check.data.audio_url;
         break;
       }
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 1500));
     }
 
     if (!audioUrl) return res.status(500).send("Audio no generado");
 
-    const audioResp = await axios.get(audioUrl, { responseType: "arraybuffer" });
+    const audio = await axios.get(audioUrl, { responseType: "arraybuffer" });
     res.set("Content-Type", "audio/mpeg");
-    res.send(audioResp.data);
+    res.send(audio.data);
   } catch (err) {
     console.error("❌ Error en /tts-fakeyou:", err.message);
     res.status(500).send("Error generando audio");
   }
 });
 
-// Iniciar servidor y suscribir al evento
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, async () => {
   console.log(`🟢 Servidor escuchando en http://localhost:${PORT}`);
   try {
     broadcasterId = await getBroadcasterId();
-    await createEventSubSubscription(broadcasterId);
+    await subscribeToEventSub(broadcasterId);
     console.log("🔔 Suscripción a recompensas activada");
   } catch (e) {
     console.error("❌ Error al configurar EventSub:", e.message);
