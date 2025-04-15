@@ -23,17 +23,13 @@ app.use(cors({
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
-
-// Permitir preflight requests
-app.options("*", cors());
-
-app.get("/", (req, res) => {
-  res.send("TTS Backend is running!");
-});
-
 // JSON parser con verificación opcional
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
 
+// Permitir preflight requests (después del json)
+app.options("*", cors());
+
+// Ruta básica de test
 app.get("/", (req, res) => {
   res.send("TTS Backend is running!");
 });
@@ -42,8 +38,7 @@ app.get("/auth/login", (req, res) => {
   const redirectUri = TWITCH_CALLBACK_URL;
   const scope = "channel:read:redemptions";
   const authUrl = `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${TWITCH_CLIENT_ID}&redirect_uri=${redirectUri}&scope=${scope}`;
-res.redirect(authUrl);
-
+  res.redirect(authUrl);
 });
 
 app.get("/twitch/callback", async (req, res) => {
@@ -94,7 +89,7 @@ app.post("/twitch/callback", express.json(), async (req, res) => {
     console.log("🔔 Evento recibido:", event);
 
     if (event.reward.title === TWITCH_REWARD_NAME) {
-      console.log(`🎁 ${event.user_name} canjeó: ${event.reward.title}`);
+      console.log(`🏱 ${event.user_name} canjeó: ${event.reward.title}`);
       allowedUsers.add(event.user_name.toLowerCase());
     }
 
@@ -163,14 +158,14 @@ async function subscribeToEventSub() {
         "Content-Type": "application/json"
       }
     });
-    
-    console.log("🔔 Suscripción a recompensas activada");
-    } catch (err) {
-      console.error("❌ Error al configurar EventSub:", err.response?.data || err.message);
-    }
-    }
-    
-    const PORT = process.env.PORT || 8080;
-    app.listen(PORT, () => {
-      console.log(`🟢 Servidor escuchando en http://localhost:${PORT}`);
-    });
+
+    console.log("\ud83d\udd14 Suscripci\u00f3n a recompensas activada");
+  } catch (err) {
+    console.error("\u274c Error al configurar EventSub:", err.response?.data || err.message);
+  }
+}
+
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`\ud83d\udfe2 Servidor escuchando en http://localhost:${PORT}`);
+});
