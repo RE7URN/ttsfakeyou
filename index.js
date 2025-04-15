@@ -17,10 +17,19 @@ let userToken = "";
 let userId = "";
 let allowedUsers = new Set();
 
-// CORS para Vercel
+// CORS completo para Vercel
 app.use(cors({
-  origin: "https://tts-project-joanmiii.vercel.app"
+  origin: "https://tts-project-joanmiii.vercel.app",
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
+// Permitir preflight requests
+app.options("*", cors());
+
+app.get("/", (req, res) => {
+  res.send("TTS Backend is running!");
+});
 
 // JSON parser con verificación opcional
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
