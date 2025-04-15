@@ -5,8 +5,9 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const app = express();
 
-app.use(cors());
-app.use(bodyParser.json());
+app.use(cors({
+  origin: "https://tts-project-joanmiii.vercel.app"
+}));
 
 const {
   TWITCH_CLIENT_ID,
