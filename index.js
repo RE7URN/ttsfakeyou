@@ -32,8 +32,9 @@ app.get("/", (req, res) => {
 app.get("/auth/login", (req, res) => {
   const redirectUri = TWITCH_CALLBACK_URL;
   const scope = "channel:read:redemptions";
-  const authUrl = \`https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=\${TWITCH_CLIENT_ID}&redirect_uri=\${redirectUri}&scope=\${scope}\`;
-  res.redirect(authUrl);
+  const authUrl = `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${TWITCH_CLIENT_ID}&redirect_uri=${redirectUri}&scope=${scope}`;
+res.redirect(authUrl);
+
 });
 
 app.get("/twitch/callback", async (req, res) => {
@@ -56,7 +57,7 @@ app.get("/twitch/callback", async (req, res) => {
     const userRes = await axios.get("https://api.twitch.tv/helix/users", {
       headers: {
         "Client-ID": TWITCH_CLIENT_ID,
-        "Authorization": \`Bearer \${userToken}\`
+        "Authorization": `Bearer ${userToken}`
       }
     });
 
@@ -84,7 +85,7 @@ app.post("/twitch/callback", express.json(), async (req, res) => {
     console.log("🔔 Evento recibido:", event);
 
     if (event.reward.title === TWITCH_REWARD_NAME) {
-      console.log(\`🎁 \${event.user_name} canjeó: \${event.reward.title}\`);
+      console.log(`🎁 ${event.user_name} canjeó: ${event.reward.title}`);
       allowedUsers.add(event.user_name.toLowerCase());
     }
 
@@ -113,7 +114,7 @@ app.post("/api/tts-fakeyou", async (req, res) => {
     let audioUrl = null;
     for (let i = 0; i < 20; i++) {
       await new Promise(r => setTimeout(r, 3000));
-      const status = await axios.get(\`https://api.fakeyou.com/tts/job/\${jobToken}\`);
+      const status = await axios.get(`https://api.fakeyou.com/tts/job/${jobToken}`);
       if (status.data.state.status === "complete_success") {
         audioUrl = status.data.state.maybe_public_bucket_wav_audio_path;
         break;
@@ -149,18 +150,18 @@ async function subscribeToEventSub() {
     }, {
       headers: {
         "Client-ID": TWITCH_CLIENT_ID,
-        "Authorization": \`Bearer \${APP_ACCESS_TOKEN}\`,
+        "Authorization": `Bearer ${APP_ACCESS_TOKEN}`,
         "Content-Type": "application/json"
       }
     });
-
+    
     console.log("🔔 Suscripción a recompensas activada");
-  } catch (err) {
-    console.error("❌ Error al configurar EventSub:", err.response?.data || err.message);
-  }
-}
-
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log(\`🟢 Servidor escuchando en http://localhost:\${PORT}\`);
-});
+    } catch (err) {
+      console.error("❌ Error al configurar EventSub:", err.response?.data || err.message);
+    }
+    }
+    
+    const PORT = process.env.PORT || 8080;
+    app.listen(PORT, () => {
+      console.log(`🟢 Servidor escuchando en http://localhost:${PORT}`);
+    });
