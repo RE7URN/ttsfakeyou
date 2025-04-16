@@ -117,6 +117,18 @@ app.get("/api/allowed/:username", (req, res) => {
   res.json({ allowed: allowedUsers.has(user) });
 });
 
+// 🚫 Ruta para consumir el permiso del usuario (elimina su acceso)
+app.post("/api/consume/:username", (req, res) => {
+  const user = req.params.username.toLowerCase();
+  if (allowedUsers.has(user)) {
+    allowedUsers.delete(user);
+    console.log(`🔒 Permiso consumido para: ${user}`);
+    res.status(200).send({ message: "Permiso consumido" });
+  } else {
+    res.status(404).send({ error: "Usuario no autorizado o ya consumido" });
+  }
+});
+
 app.post("/api/tts-fakeyou", async (req, res) => {
   const { voice, message } = req.body;
 
