@@ -17,19 +17,20 @@ let userToken = "";
 let userId = "";
 let allowedUsers = new Set();
 
-// CORS completo para Vercel
+// ✅ JSON parser primero
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
+
+// ✅ CORS configurado correctamente
 app.use(cors({
   origin: "https://tts-project-joanmiii.vercel.app",
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
-// JSON parser con verificación opcional
-app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
 
-// Permitir preflight requests (después del json)
+// ✅ Preflight requests habilitadas
 app.options("*", cors());
 
-// Ruta básica de test
+// 🟢 Ruta de prueba
 app.get("/", (req, res) => {
   res.send("TTS Backend is running!");
 });
@@ -76,8 +77,7 @@ app.get("/twitch/callback", async (req, res) => {
   }
 });
 
-// CORREGIDO: Añadir JSON parser específico a esta ruta
-app.post("/twitch/callback", express.json(), async (req, res) => {
+app.post("/twitch/callback", async (req, res) => {
   const type = req.header("Twitch-Eventsub-Message-Type");
 
   if (type === "webhook_callback_verification") {
@@ -159,13 +159,13 @@ async function subscribeToEventSub() {
       }
     });
 
-    console.log("\ud83d\udd14 Suscripci\u00f3n a recompensas activada");
+    console.log("🔔 Suscripción a recompensas activada");
   } catch (err) {
-    console.error("\u274c Error al configurar EventSub:", err.response?.data || err.message);
+    console.error("❌ Error al configurar EventSub:", err.response?.data || err.message);
   }
 }
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-  console.log(`\ud83d\udfe2 Servidor escuchando en http://localhost:${PORT}`);
+  console.log(`🟢 Servidor escuchando en http://localhost:${PORT}`);
 });
