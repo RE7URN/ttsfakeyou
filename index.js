@@ -1,4 +1,6 @@
+// ✅ Cargar variables de entorno
 require("dotenv").config();
+
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
@@ -17,23 +19,34 @@ let userToken = "";
 let userId = "";
 let allowedUsers = new Set();
 
-// ✅ JSON parser primero
-app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
-
-// ✅ CORS configurado correctamente
+// ✅ CORS PRIMERO
 app.use(cors({
   origin: "https://tts-project-joanmiii.vercel.app",
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-// ✅ Preflight requests habilitadas
+// ✅ Middleware adicional por si Railway da problemas
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "https://tts-project-joanmiii.vercel.app");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  next();
+});
+
+// ✅ JSON parser después de CORS
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
+
+// ✅ Preflight OPTIONS habilitado
 app.options("*", cors());
 
-// 🟢 Ruta de prueba
+// 🚀 Ruta de prueba
 app.get("/", (req, res) => {
   res.send("TTS Backend is running!");
 });
+
+// 🧪 Test: meter usuario permitido manualmente
+allowedUsers.add("joanmiii");
 
 app.get("/auth/login", (req, res) => {
   const redirectUri = TWITCH_CALLBACK_URL;
