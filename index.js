@@ -17,35 +17,28 @@ let userToken = "";
 let userId = "";
 let allowedUsers = new Set();
 
-// ✅ CORS PRIMERO
-app.use(cors({
+// ✅ CORS configurado primero
+const corsOptions = {
   origin: "https://tts-project-joanmiii.vercel.app",
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
-}));
+};
 
-// ✅ Middleware adicional por si Railway da problemas
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "https://tts-project-joanmiii.vercel.app");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  next();
-});
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
-// ✅ JSON parser después de CORS
+// ✅ JSON parser después de cors
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
 
-// ✅ Preflight OPTIONS habilitado
-app.options("*", cors());
+// 🧪 Test temporal (añadir usuario permitido manualmente)
+allowedUsers.add("joanmiii");
 
-// 🚀 Ruta de prueba
+// 🟢 Ruta base
 app.get("/", (req, res) => {
   res.send("TTS Backend is running!");
 });
 
-// 🧪 Test: meter usuario permitido manualmente
-allowedUsers.add("joanmiii");
-
+// 🟣 Login OAuth
 app.get("/auth/login", (req, res) => {
   const redirectUri = TWITCH_CALLBACK_URL;
   const scope = "channel:read:redemptions";
@@ -53,6 +46,7 @@ app.get("/auth/login", (req, res) => {
   res.redirect(authUrl);
 });
 
+// 🔁 Callback de Twitch
 app.get("/twitch/callback", async (req, res) => {
   const code = req.query.code;
   if (!code) return res.send("❌ Código no proporcionado.");
@@ -88,6 +82,7 @@ app.get("/twitch/callback", async (req, res) => {
   }
 });
 
+// 📬 Webhook EventSub
 app.post("/twitch/callback", async (req, res) => {
   const type = req.header("Twitch-Eventsub-Message-Type");
 
@@ -110,12 +105,13 @@ app.post("/twitch/callback", async (req, res) => {
   return res.status(200).end();
 });
 
+// 🔍 Verificar si el usuario está autorizado
 app.get("/api/allowed/:username", (req, res) => {
   const user = req.params.username.toLowerCase();
   res.json({ allowed: allowedUsers.has(user) });
 });
 
-// 🚫 Ruta para consumir el permiso del usuario (elimina su acceso)
+// 🔒 Consumir el permiso una vez enviado el mensaje
 app.post("/api/consume/:username", (req, res) => {
   const user = req.params.username.toLowerCase();
   if (allowedUsers.has(user)) {
@@ -127,6 +123,7 @@ app.post("/api/consume/:username", (req, res) => {
   }
 });
 
+// 🔊 Generar voz con FakeYou
 app.post("/api/tts-fakeyou", async (req, res) => {
   const { voice, message } = req.body;
 
@@ -161,9 +158,10 @@ app.post("/api/tts-fakeyou", async (req, res) => {
   }
 });
 
+// 📡 Suscribirse a eventos de Twitch
 async function subscribeToEventSub() {
   try {
-    const response = await axios.post("https://api.twitch.tv/helix/eventsub/subscriptions", {
+    await axios.post("https://api.twitch.tv/helix/eventsub/subscriptions", {
       type: "channel.channel_points_custom_reward_redemption.add",
       version: "1",
       condition: {
@@ -188,6 +186,7 @@ async function subscribeToEventSub() {
   }
 }
 
+// 🚀 Iniciar servidor
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`🟢 Servidor escuchando en http://localhost:${PORT}`);
