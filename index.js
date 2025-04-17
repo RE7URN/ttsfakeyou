@@ -4,6 +4,7 @@ const axios = require("axios");
 const cors = require("cors");
 const app = express();
 
+// Variables de entorno
 const {
   TWITCH_CLIENT_ID,
   TWITCH_CLIENT_SECRET,
@@ -17,11 +18,18 @@ let userToken = "";
 let userId = "";
 let allowedUsers = new Set();
 
-// Reemplazo temporal para pruebas
-app.use(cors());
+// ✅ Middleware manual para CORS seguro
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "https://tts-project-joanmiii.vercel.app");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  next();
+});
+
+// ✅ Permitir preflight requests (OPTIONS)
 app.options("*", cors());
 
-// ✅ JSON parser después de cors
+// ✅ JSON parser
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
 
 // 🧪 Test temporal (añadir usuario permitido manualmente)
@@ -102,6 +110,7 @@ app.post("/twitch/callback", async (req, res) => {
 // 🔍 Verificar si el usuario está autorizado
 app.get("/api/allowed/:username", (req, res) => {
   const user = req.params.username.toLowerCase();
+  console.log("🔎 Verificando usuario:", user);
   res.json({ allowed: allowedUsers.has(user) });
 });
 
