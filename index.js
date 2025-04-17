@@ -4,11 +4,9 @@ const axios = require("axios");
 const cors = require("cors");
 const app = express();
 
-// Variables de entorno
 const {
   TWITCH_CLIENT_ID,
   TWITCH_CLIENT_SECRET,
-  TWITCH_USERNAME,
   TWITCH_CALLBACK_URL,
   TWITCH_REWARD_NAME,
   APP_ACCESS_TOKEN
@@ -18,29 +16,24 @@ let userToken = "";
 let userId = "";
 let allowedUsers = new Set();
 
-// ✅ Middleware manual para CORS seguro
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "https://tts-project-joanmiii.vercel.app");
-  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-  next();
-});
+// ✅ CORS solo para dominios de producción
+app.use(cors({
+  origin: ["https://tts-project-joanmiii.vercel.app"],
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 
-// ✅ Permitir preflight requests (OPTIONS)
 app.options("*", cors());
 
 // ✅ JSON parser
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
 
-// 🧪 Test temporal (añadir usuario permitido manualmente)
-allowedUsers.add("joanmiii");
-
-// 🟢 Ruta base
+// 🟢 Ruta básica
 app.get("/", (req, res) => {
   res.send("TTS Backend is running!");
 });
 
-// 🟣 Login OAuth
+// 🔐 Login OAuth
 app.get("/auth/login", (req, res) => {
   const redirectUri = TWITCH_CALLBACK_URL;
   const scope = "channel:read:redemptions";
@@ -48,7 +41,7 @@ app.get("/auth/login", (req, res) => {
   res.redirect(authUrl);
 });
 
-// 🔁 Callback de Twitch
+// 🔁 Callback de Twitch OAuth
 app.get("/twitch/callback", async (req, res) => {
   const code = req.query.code;
   if (!code) return res.send("❌ Código no proporcionado.");
@@ -79,12 +72,12 @@ app.get("/twitch/callback", async (req, res) => {
     await subscribeToEventSub();
     res.send("✅ Token de Twitch recibido. Ya puedes cerrar esta pestaña.");
   } catch (err) {
-    console.error("❌ Error al obtener token de usuario:", err.response?.data || err.message);
+    console.error("❌ Error al obtener token:", err.response?.data || err.message);
     res.send("❌ Error al obtener token de usuario");
   }
 });
 
-// 📬 Webhook EventSub
+// 📬 Webhook EventSub de Twitch
 app.post("/twitch/callback", async (req, res) => {
   const type = req.header("Twitch-Eventsub-Message-Type");
 
@@ -94,10 +87,9 @@ app.post("/twitch/callback", async (req, res) => {
 
   if (type === "notification") {
     const event = req.body.event;
-    console.log("🔔 Evento recibido:", event);
 
     if (event.reward.title === TWITCH_REWARD_NAME) {
-      console.log(`🏱 ${event.user_name} canjeó: ${event.reward.title}`);
+      console.log(`🎁 ${event.user_name} canjeó: ${event.reward.title}`);
       allowedUsers.add(event.user_name.toLowerCase());
     }
 
@@ -107,14 +99,13 @@ app.post("/twitch/callback", async (req, res) => {
   return res.status(200).end();
 });
 
-// 🔍 Verificar si el usuario está autorizado
+// ✅ Verificar si usuario está autorizado
 app.get("/api/allowed/:username", (req, res) => {
   const user = req.params.username.toLowerCase();
-  console.log("🔎 Verificando usuario:", user);
   res.json({ allowed: allowedUsers.has(user) });
 });
 
-// 🔒 Consumir el permiso una vez enviado el mensaje
+// 🔒 Consumir permiso
 app.post("/api/consume/:username", (req, res) => {
   const user = req.params.username.toLowerCase();
   if (allowedUsers.has(user)) {
@@ -126,7 +117,7 @@ app.post("/api/consume/:username", (req, res) => {
   }
 });
 
-// 🔊 Generar voz con FakeYou
+// 🔊 Text to speech con FakeYou
 app.post("/api/tts-fakeyou", async (req, res) => {
   const { voice, message } = req.body;
 
@@ -161,7 +152,7 @@ app.post("/api/tts-fakeyou", async (req, res) => {
   }
 });
 
-// 📡 Suscribirse a eventos de Twitch
+// 📡 Suscripción a eventos EventSub
 async function subscribeToEventSub() {
   try {
     await axios.post("https://api.twitch.tv/helix/eventsub/subscriptions", {
@@ -185,7 +176,7 @@ async function subscribeToEventSub() {
 
     console.log("🔔 Suscripción a recompensas activada");
   } catch (err) {
-    console.error("❌ Error al configurar EventSub:", err.response?.data || err.message);
+    console.error("❌ Error al suscribirse a EventSub:", err.response?.data || err.message);
   }
 }
 
