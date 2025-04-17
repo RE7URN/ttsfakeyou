@@ -17,18 +17,9 @@ let userToken = "";
 let userId = "";
 let allowedUsers = new Set();
 
-// ✅ CORS configurado primero
-const corsOptions = {
-  origin: [
-    "https://tts-project-joanmiii.vercel.app",
-    "https://tts-project-joanmiii-a3m7z93j0-joan-miquels-projects-d1084b0e.vercel.app"
-  ],
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-};
-
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+// Reemplazo temporal para pruebas
+app.use(cors());
+app.options("*", cors());
 
 // ✅ JSON parser después de cors
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
