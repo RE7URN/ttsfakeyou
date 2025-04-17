@@ -19,7 +19,10 @@ let allowedUsers = new Set();
 
 // ✅ CORS configurado primero
 const corsOptions = {
-  origin: "https://tts-project-joanmiii.vercel.app",
+  origin: [
+    "https://tts-project-joanmiii.vercel.app",
+    "https://tts-project-joanmiii-a3m7z93j0-joan-miquels-projects-d1084b0e.vercel.app"
+  ],
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 };
