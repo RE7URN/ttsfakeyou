@@ -16,13 +16,25 @@ let userToken = "";
 let userId = "";
 let allowedUsers = new Set();
 
-// ✅ CORS solo para dominios de producción
+// ✅ CORS SOLO PARA DOMINIOS PERMITIDOS
+const allowedOrigins = [
+  "https://tts-project-joanmiii.vercel.app",
+  "https://tts-project-joanmiii-rhpk4qfbm-joan-miquels-projects-d1084b0e.vercel.app"
+];
+
 app.use(cors({
-  origin: ["https://tts-project-joanmiii.vercel.app"],
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
+// ✅ Preflight OPTIONS
 app.options("*", cors());
 
 // ✅ JSON parser
