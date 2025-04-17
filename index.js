@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
+const cors = require("cors");
 const app = express();
 
 const {
@@ -15,29 +16,33 @@ let userToken = "";
 let userId = "";
 let allowedUsers = new Set();
 
-// ✅ Middleware manual de CORS
+// ✅ CORS configurado con múltiples dominios permitidos
 const allowedOrigins = [
   "https://tts-project-joanmiii.vercel.app",
   "https://tts-project-joanmiii-rhpk4qfbm-joan-miquels-projects-d1084b0e.vercel.app"
 ];
 
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
-  }
-  next();
-});
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+app.options("*", cors());
 
 // ✅ JSON parser
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
 
-// 🟢 Ruta base
+// 🧪 Temporal para pruebas manuales
+allowedUsers.add("joanmiii");
+
+// 🟢 Ruta básica
 app.get("/", (req, res) => {
   res.send("TTS Backend is running!");
 });
