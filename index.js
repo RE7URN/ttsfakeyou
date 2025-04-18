@@ -1,7 +1,6 @@
 require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
-const cors = require("cors");
 const app = express();
 
 const {
@@ -16,33 +15,36 @@ let userToken = "";
 let userId = "";
 let allowedUsers = new Set();
 
-// ✅ CORS configurado con múltiples dominios permitidos
-const allowedOrigins = [
-  "https://tts-project-joanmiii.vercel.app",
-  "https://tts-project-joanmiii-rhpk4qfbm-joan-miquels-projects-d1084b0e.vercel.app"
-];
+// ✅ Middleware CORS manual
+app.use((req, res, next) => {
+  const allowedOrigins = [
+    "https://tts-project-joanmiii.vercel.app",
+    "https://tts-project-joanmiii-rhpk4qfbm-joan-miquels-projects-d1084b0e.vercel.app"
+  ];
+  const origin = req.headers.origin;
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
 
-app.options("*", cors());
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
 
 // ✅ JSON parser
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
 
-// 🧪 Temporal para pruebas manuales
+// 🧪 Usuario de prueba
 allowedUsers.add("joanmiii");
 
-// 🟢 Ruta básica
+// 🟢 Ruta base
 app.get("/", (req, res) => {
   res.send("TTS Backend is running!");
 });
@@ -55,7 +57,7 @@ app.get("/auth/login", (req, res) => {
   res.redirect(authUrl);
 });
 
-// 🔁 Callback de Twitch OAuth
+// 🔁 Callback de Twitch
 app.get("/twitch/callback", async (req, res) => {
   const code = req.query.code;
   if (!code) return res.send("❌ Código no proporcionado.");
@@ -91,7 +93,7 @@ app.get("/twitch/callback", async (req, res) => {
   }
 });
 
-// 📬 Webhook EventSub de Twitch
+// 📬 Webhook EventSub
 app.post("/twitch/callback", async (req, res) => {
   const type = req.header("Twitch-Eventsub-Message-Type");
 
@@ -113,7 +115,7 @@ app.post("/twitch/callback", async (req, res) => {
   return res.status(200).end();
 });
 
-// ✅ Verificar si usuario está autorizado
+// 🔍 Verificar si usuario está autorizado
 app.get("/api/allowed/:username", (req, res) => {
   const user = req.params.username.toLowerCase();
   res.json({ allowed: allowedUsers.has(user) });
@@ -131,7 +133,7 @@ app.post("/api/consume/:username", (req, res) => {
   }
 });
 
-// 🔊 Text to speech con FakeYou
+// 🔊 TTS con FakeYou
 app.post("/api/tts-fakeyou", async (req, res) => {
   const { voice, message } = req.body;
 
@@ -154,7 +156,9 @@ app.post("/api/tts-fakeyou", async (req, res) => {
     }
 
     if (audioUrl) {
-      const audioStream = await axios.get("https://storage.googleapis.com" + audioUrl, { responseType: "stream" });
+      const audioStream = await axios.get("https://storage.googleapis.com" + audioUrl, {
+        responseType: "stream"
+      });
       res.setHeader("Content-Type", "audio/wav");
       return audioStream.data.pipe(res);
     } else {
