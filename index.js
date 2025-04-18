@@ -16,23 +16,22 @@ let userId = "";
 let allowedUsers = new Set();
 
 // ✅ Middleware CORS manual
-app.use((req, res, next) => {
-  const allowedOrigins = [
-    "https://tts-project-joanmiii.vercel.app",
-    "https://tts-project-joanmiii-rhpk4qfbm-joan-miquels-projects-d1084b0e.vercel.app"
-  ];
-  const origin = req.headers.origin;
+const allowedOrigins = [
+  "https://tts-project-joanmiii.vercel.app",
+  "https://tts-project-joanmiii-rhpk4qfbm-joan-miquels-projects-d1084b0e.vercel.app"
+];
 
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin"); 
   }
-
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
 
   if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
+    return res.status(204).end(); 
   }
 
   next();
