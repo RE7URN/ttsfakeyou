@@ -170,7 +170,7 @@ app.post("/api/tts", async (req, res) => {
         method: "POST",
         url: `https://api.elevenlabs.io/v1/text-to-speech/${voice.replace("EL:", "")}`,
         headers: {
-          "xi-api-key": ELEVENLABS_API_KEY,
+          "xi-api-key": process.env.ELEVENLABS_API_KEY,
           "Content-Type": "application/json"
         },
         data: {
