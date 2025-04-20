@@ -137,12 +137,18 @@ app.post("/api/consume/:username", (req, res) => {
 app.post("/api/tts-fakeyou", async (req, res) => {
   const { voice, message } = req.body;
 
+  console.log("🔍 Petición TTS recibida con:");
+  console.log("Voice:", voice);
+  console.log("Message:", message);
+
   try {
     const gen = await axios.post("https://api.fakeyou.com/tts/inference", {
       tts_model_token: voice,
       inference_text: message,
-      uuid_idempotency_token: uuidv4() // ✅ CAMPO AÑADIDO
+      uuid_idempotency_token: uuidv4()
     });
+
+    console.log("🟢 Respuesta de FakeYou:", gen.data);
 
     const jobToken = gen.data.inference_job_token;
 
@@ -163,6 +169,7 @@ app.post("/api/tts-fakeyou", async (req, res) => {
       res.setHeader("Content-Type", "audio/wav");
       return audioStream.data.pipe(res);
     } else {
+      console.log("⏱ Tiempo de espera agotado");
       return res.status(408).send("Tiempo de espera agotado.");
     }
   } catch (err) {
@@ -170,6 +177,7 @@ app.post("/api/tts-fakeyou", async (req, res) => {
     res.status(500).send("Error generando voz");
   }
 });
+
 
 // 📡 Suscripción a eventos EventSub
 async function subscribeToEventSub() {
