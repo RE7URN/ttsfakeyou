@@ -17,7 +17,7 @@ let allowedUsers = new Set();
 
 // ✅ Middleware CORS manual
 const allowedOrigins = [
-  "https://tts-project-joanmiii.vercel.app",
+  "https://ttsjoanmiii.vercel.app",
   "https://tts-project-joanmiii-rhpk4qfbm-joan-miquels-projects-d1084b0e.vercel.app"
 ];
 
