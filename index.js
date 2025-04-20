@@ -183,36 +183,37 @@ app.post("/api/tts", async (req, res) => {
   } else {
     res.status(400).send("Modelo de voz no reconocido");
   }
-});
+}); // 👈 ESTA llave faltaba
 
+// 📡 Suscribirse a eventos EventSub
 async function subscribeToEventSub() {
-  try {
-    await axios.post("https://api.twitch.tv/helix/eventsub/subscriptions", {
-      type: "channel.channel_points_custom_reward_redemption.add",
-      version: "1",
-      condition: {
-        broadcaster_user_id: userId
-      },
-      transport: {
-        method: "webhook",
-        callback: TWITCH_CALLBACK_URL,
-        secret: "joanmiiisecret"
-      }
-    }, {
-      headers: {
-        "Client-ID": TWITCH_CLIENT_ID,
-        "Authorization": `Bearer ${APP_ACCESS_TOKEN}`,
-        "Content-Type": "application/json"
-      }
-    });
+try {
+  await axios.post("https://api.twitch.tv/helix/eventsub/subscriptions", {
+    type: "channel.channel_points_custom_reward_redemption.add",
+    version: "1",
+    condition: {
+      broadcaster_user_id: userId
+    },
+    transport: {
+      method: "webhook",
+      callback: TWITCH_CALLBACK_URL,
+      secret: "joanmiiisecret"
+    }
+  }, {
+    headers: {
+      "Client-ID": TWITCH_CLIENT_ID,
+      "Authorization": `Bearer ${APP_ACCESS_TOKEN}`,
+      "Content-Type": "application/json"
+    }
+  });
 
-    console.log("🔔 Suscripción a recompensas activada");
-  } catch (err) {
-    console.error("❌ Error al suscribirse a EventSub:", err.response?.data || err.message);
-  }
+  console.log("🔔 Suscripción a recompensas activada");
+} catch (err) {
+  console.error("❌ Error al suscribirse a EventSub:", err.response?.data || err.message);
+}
 }
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-  console.log(`🟢 Servidor escuchando en http://localhost:${PORT}`);
+console.log(`🟢 Servidor escuchando en http://localhost:${PORT}`);
 });
