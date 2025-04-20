@@ -178,7 +178,7 @@ app.post("/api/tts", async (req, res) => {
       const status = err.response?.status;
       const msg = err.response?.data || err.message;
       console.error("❌ Error TTS (ElevenLabs):", msg);
-      res.status(status || 500).send("Error generando voz con ElevenLabs");
+      res.status(status || 500).send(msg);
     }
   } else {
     res.status(400).send("Modelo de voz no reconocido");
