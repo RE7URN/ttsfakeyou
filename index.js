@@ -146,7 +146,7 @@ app.post("/api/tts", async (req, res) => {
   const { username, voice, message } = req.body;
 
   lastTTSMessage = `${username}: ${message}`;
-  broadcastOverlayMessage(lastTTSMessage); // ✅ Enviar mensaje por WebSocket
+  broadcastOverlayMessage(lastTTSMessage);
 
   if (voice.startsWith("TM:")) {
     try {
@@ -192,7 +192,7 @@ app.post("/api/tts", async (req, res) => {
         },
         data: {
           text: message,
-          model_id: "eleven_multilingual_v2",
+          model_id: "eleven_multilingual_v2", // ✅ Este es el motor multilingüe correcto
           voice_settings: {
             stability: 0.5,
             similarity_boost: 0.75
@@ -209,12 +209,12 @@ app.post("/api/tts", async (req, res) => {
       console.error("❌ Error TTS (ElevenLabs):", msg);
       res.status(status || 500).send(msg);
     }
-
   } else {
     res.status(400).send("Modelo de voz no reconocido");
   }
 });
 
+// 🔔 Suscribirse a eventos de Twitch
 async function subscribeToEventSub() {
   try {
     await axios.post("https://api.twitch.tv/helix/eventsub/subscriptions", {
@@ -242,7 +242,7 @@ async function subscribeToEventSub() {
   }
 }
 
-// 🔥 Escuchar con WebSocket también
+// 🔥 Escuchar en el puerto con WebSocket también
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
   console.log(`🟢 Servidor escuchando en http://localhost:${PORT}`);
