@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
+const { v4: uuidv4 } = require("uuid"); // ✅ NUEVO
 const app = express();
 
 const {
@@ -25,13 +26,13 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (allowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Vary", "Origin"); 
+    res.setHeader("Vary", "Origin");
   }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   if (req.method === "OPTIONS") {
-    return res.status(204).end(); 
+    return res.status(204).end();
   }
 
   next();
@@ -132,14 +133,15 @@ app.post("/api/consume/:username", (req, res) => {
   }
 });
 
-// 🔊 TTS con FakeYou
+// 🔊 TTS con FakeYou (corregido)
 app.post("/api/tts-fakeyou", async (req, res) => {
   const { voice, message } = req.body;
 
   try {
     const gen = await axios.post("https://api.fakeyou.com/tts/inference", {
       tts_model_token: voice,
-      inference_text: message
+      inference_text: message,
+      uuid_idempotency_token: uuidv4() // ✅ CAMPO AÑADIDO
     });
 
     const jobToken = gen.data.inference_job_token;
