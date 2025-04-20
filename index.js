@@ -2,6 +2,8 @@ require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
 const { v4: uuidv4 } = require("uuid");
+const http = require("http");
+const { Server } = require("ws");
 const app = express();
 
 const {
@@ -16,8 +18,32 @@ const {
 let userToken = "";
 let userId = "";
 let allowedUsers = new Set();
-let lastTTSMessage = ""; // ✅ NUEVO
+let lastTTSMessage = "";
 
+// 🧠 WebSocket
+const server = http.createServer(app);
+const wss = new Server({ server });
+let overlayClients = [];
+
+wss.on("connection", (ws) => {
+  console.log("🟢 Overlay conectado por WebSocket");
+  overlayClients.push(ws);
+
+  ws.on("close", () => {
+    overlayClients = overlayClients.filter(client => client !== ws);
+    console.log("🔴 Overlay desconectado");
+  });
+});
+
+function broadcastOverlayMessage(text) {
+  overlayClients.forEach(ws => {
+    if (ws.readyState === ws.OPEN) {
+      ws.send(text);
+    }
+  });
+}
+
+// 🧩 Middleware
 const allowedOrigins = [
   "https://ttsjoanmiii.vercel.app",
   "https://ttsjoanmiii-nri0z0qdo-joan-miquels-projects-d1084b0e.vercel.app/"
@@ -38,6 +64,7 @@ app.use((req, res, next) => {
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
 allowedUsers.add("joanmiii");
 
+// 🔐 OAuth y rutas
 app.get("/", (req, res) => res.send("TTS Backend is running!"));
 
 app.get("/auth/login", (req, res) => {
@@ -111,7 +138,6 @@ app.post("/api/consume/:username", (req, res) => {
   }
 });
 
-// ✅ Endpoint para que el overlay lo consulte cada segundo
 app.get("/api/last-message", (req, res) => {
   res.json({ message: lastTTSMessage });
 });
@@ -119,8 +145,8 @@ app.get("/api/last-message", (req, res) => {
 app.post("/api/tts", async (req, res) => {
   const { username, voice, message } = req.body;
 
-  // 🟣 Guardamos mensaje para el overlay
   lastTTSMessage = `${username}: ${message}`;
+  broadcastOverlayMessage(lastTTSMessage); // ✅ Enviar mensaje por WebSocket
 
   if (voice.startsWith("TM:")) {
     try {
@@ -131,7 +157,6 @@ app.post("/api/tts", async (req, res) => {
       });
 
       const jobToken = gen.data.inference_job_token;
-
       let audioUrl = null;
       for (let i = 0; i < 20; i++) {
         await new Promise(r => setTimeout(r, 3000));
@@ -155,6 +180,7 @@ app.post("/api/tts", async (req, res) => {
       console.error("❌ Error TTS (FakeYou):", err.response?.data || err.message);
       res.status(500).send("Error generando voz con FakeYou");
     }
+
   } else if (voice.startsWith("EL:")) {
     try {
       const response = await axios({
@@ -183,6 +209,7 @@ app.post("/api/tts", async (req, res) => {
       console.error("❌ Error TTS (ElevenLabs):", msg);
       res.status(status || 500).send(msg);
     }
+
   } else {
     res.status(400).send("Modelo de voz no reconocido");
   }
@@ -215,7 +242,8 @@ async function subscribeToEventSub() {
   }
 }
 
+// 🔥 Escuchar con WebSocket también
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🟢 Servidor escuchando en http://localhost:${PORT}`);
 });
