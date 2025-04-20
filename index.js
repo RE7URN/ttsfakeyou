@@ -134,47 +134,74 @@ app.post("/api/consume/:username", (req, res) => {
 });
 
 // 🔊 TTS con FakeYou (corregido)
-app.post("/api/tts-fakeyou", async (req, res) => {
+// 🔊 Ruta unificada TTS (FakeYou o ElevenLabs según el prefijo del modelo)
+app.post("/api/tts", async (req, res) => {
   const { voice, message } = req.body;
 
-  console.log("🔍 Petición TTS recibida con:");
-  console.log("Voice:", voice);
-  console.log("Message:", message);
+  if (voice.startsWith("TM:")) {
+    // 🟣 FakeYou
+    try {
+      const gen = await axios.post("https://api.fakeyou.com/tts/inference", {
+        tts_model_token: voice,
+        inference_text: message,
+        uuid_idempotency_token: uuidv4()
+      });
 
-  try {
-    const gen = await axios.post("https://api.fakeyou.com/tts/inference", {
-      tts_model_token: voice,
-      inference_text: message,
-      uuid_idempotency_token: uuidv4()
-    });
+      const jobToken = gen.data.inference_job_token;
 
-    console.log("🟢 Respuesta de FakeYou:", gen.data);
-
-    const jobToken = gen.data.inference_job_token;
-
-    let audioUrl = null;
-    for (let i = 0; i < 20; i++) {
-      await new Promise(r => setTimeout(r, 3000));
-      const status = await axios.get(`https://api.fakeyou.com/tts/job/${jobToken}`);
-      if (status.data.state.status === "complete_success") {
-        audioUrl = status.data.state.maybe_public_bucket_wav_audio_path;
-        break;
+      let audioUrl = null;
+      for (let i = 0; i < 20; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        const status = await axios.get(`https://api.fakeyou.com/tts/job/${jobToken}`);
+        if (status.data.state.status === "complete_success") {
+          audioUrl = status.data.state.maybe_public_bucket_wav_audio_path;
+          break;
+        }
       }
+
+      if (audioUrl) {
+        const audioStream = await axios.get("https://storage.googleapis.com" + audioUrl, {
+          responseType: "stream"
+        });
+        res.setHeader("Content-Type", "audio/wav");
+        return audioStream.data.pipe(res);
+      } else {
+        return res.status(408).send("Tiempo de espera agotado.");
+      }
+    } catch (err) {
+      console.error("❌ Error TTS (FakeYou):", err.response?.data || err.message);
+      res.status(500).send("Error generando voz con FakeYou");
     }
 
-    if (audioUrl) {
-      const audioStream = await axios.get("https://storage.googleapis.com" + audioUrl, {
+  } else if (voice.startsWith("EL:")) {
+    // 🟡 ElevenLabs
+    try {
+      const audio = await axios({
+        method: "POST",
+        url: `https://api.elevenlabs.io/v1/text-to-speech/${voice.replace("EL:", "")}`,
+        headers: {
+          "xi-api-key": process.env.ELEVENLABS_API_KEY,
+          "Content-Type": "application/json"
+        },
+        data: {
+          text: message,
+          model_id: "eleven_monolingual_v1",
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75
+          }
+        },
         responseType: "stream"
       });
-      res.setHeader("Content-Type", "audio/wav");
-      return audioStream.data.pipe(res);
-    } else {
-      console.log("⏱ Tiempo de espera agotado");
-      return res.status(408).send("Tiempo de espera agotado.");
+
+      res.setHeader("Content-Type", "audio/mpeg");
+      audio.data.pipe(res);
+    } catch (err) {
+      console.error("❌ Error TTS (ElevenLabs):", err.response?.data || err.message);
+      res.status(500).send("Error generando voz con ElevenLabs");
     }
-  } catch (err) {
-    console.error("❌ Error TTS:", err.response?.data || err.message);
-    res.status(500).send("Error generando voz");
+  } else {
+    res.status(400).send("Modelo de voz no reconocido");
   }
 });
 
