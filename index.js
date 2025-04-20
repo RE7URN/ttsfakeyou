@@ -10,14 +10,13 @@ const {
   TWITCH_CALLBACK_URL,
   TWITCH_REWARD_NAME,
   APP_ACCESS_TOKEN,
-  ELEVENLABS_API_KEY // ✅ asegúrate de tenerlo en el .env
+  ELEVENLABS_API_KEY
 } = process.env;
 
 let userToken = "";
 let userId = "";
 let allowedUsers = new Set();
 
-// ✅ Middleware CORS manual
 const allowedOrigins = [
   "https://ttsjoanmiii.vercel.app",
   "https://ttsjoanmiii-nri0z0qdo-joan-miquels-projects-d1084b0e.vercel.app/"
@@ -35,18 +34,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ JSON parser
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
 
-// 🧪 Usuario de prueba
 allowedUsers.add("joanmiii");
 
-// 🟢 Ruta base
 app.get("/", (req, res) => {
   res.send("TTS Backend is running!");
 });
 
-// 🔐 Login OAuth
 app.get("/auth/login", (req, res) => {
   const redirectUri = TWITCH_CALLBACK_URL;
   const scope = "channel:read:redemptions";
@@ -54,7 +49,6 @@ app.get("/auth/login", (req, res) => {
   res.redirect(authUrl);
 });
 
-// 🔁 Callback de Twitch
 app.get("/twitch/callback", async (req, res) => {
   const code = req.query.code;
   if (!code) return res.send("❌ Código no proporcionado.");
@@ -89,7 +83,6 @@ app.get("/twitch/callback", async (req, res) => {
   }
 });
 
-// 📬 Webhook EventSub
 app.post("/twitch/callback", async (req, res) => {
   const type = req.header("Twitch-Eventsub-Message-Type");
   if (type === "webhook_callback_verification") {
@@ -106,13 +99,11 @@ app.post("/twitch/callback", async (req, res) => {
   return res.status(200).end();
 });
 
-// 🔍 Verificar si usuario está autorizado
 app.get("/api/allowed/:username", (req, res) => {
   const user = req.params.username.toLowerCase();
   res.json({ allowed: allowedUsers.has(user) });
 });
 
-// 🔒 Consumir permiso
 app.post("/api/consume/:username", (req, res) => {
   const user = req.params.username.toLowerCase();
   if (allowedUsers.has(user)) {
@@ -124,12 +115,10 @@ app.post("/api/consume/:username", (req, res) => {
   }
 });
 
-// 🔊 TTS unificado: FakeYou y ElevenLabs
 app.post("/api/tts", async (req, res) => {
   const { voice, message } = req.body;
 
   if (voice.startsWith("TM:")) {
-    // 🟣 FakeYou
     try {
       const gen = await axios.post("https://api.fakeyou.com/tts/inference", {
         tts_model_token: voice,
@@ -164,13 +153,12 @@ app.post("/api/tts", async (req, res) => {
     }
 
   } else if (voice.startsWith("EL:")) {
-    // 🟡 ElevenLabs
     try {
       const response = await axios({
         method: "POST",
         url: `https://api.elevenlabs.io/v1/text-to-speech/${voice.replace("EL:", "")}`,
         headers: {
-          "xi-api-key": process.env.ELEVENLABS_API_KEY,
+          "xi-api-key": ELEVENLABS_API_KEY,
           "Content-Type": "application/json"
         },
         data: {
@@ -181,21 +169,22 @@ app.post("/api/tts", async (req, res) => {
             similarity_boost: 0.75
           }
         },
-        responseType: "stream" // ⚠️ CLAVE
+        responseType: "stream"
       });
-  
+
       res.setHeader("Content-Type", "audio/mpeg");
-      response.data.pipe(res); // ✅ ENVIAR AUDIO AL CLIENTE
+      response.data.pipe(res);
     } catch (err) {
       const status = err.response?.status;
       const msg = err.response?.data || err.message;
-  
       console.error("❌ Error TTS (ElevenLabs):", msg);
       res.status(status || 500).send("Error generando voz con ElevenLabs");
     }
+  } else {
+    res.status(400).send("Modelo de voz no reconocido");
   }
+});
 
-// 📡 Suscribirse a eventos EventSub
 async function subscribeToEventSub() {
   try {
     await axios.post("https://api.twitch.tv/helix/eventsub/subscriptions", {
@@ -223,7 +212,6 @@ async function subscribeToEventSub() {
   }
 }
 
-// 🚀 Iniciar servidor
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`🟢 Servidor escuchando en http://localhost:${PORT}`);
