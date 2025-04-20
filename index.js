@@ -166,7 +166,7 @@ app.post("/api/tts", async (req, res) => {
   } else if (voice.startsWith("EL:")) {
     // 🟡 ElevenLabs
     try {
-      const audio = await axios({
+      const response = await axios({
         method: "POST",
         url: `https://api.elevenlabs.io/v1/text-to-speech/${voice.replace("EL:", "")}`,
         headers: {
@@ -181,20 +181,19 @@ app.post("/api/tts", async (req, res) => {
             similarity_boost: 0.75
           }
         },
-        responseType: "stream"
+        responseType: "stream" // ⚠️ CLAVE
       });
-
+  
       res.setHeader("Content-Type", "audio/mpeg");
-      audio.data.pipe(res);
+      response.data.pipe(res); // ✅ ENVIAR AUDIO AL CLIENTE
     } catch (err) {
-      console.error("❌ Error TTS (ElevenLabs):", err.response?.data || err.message);
-      res.status(500).send("Error generando voz con ElevenLabs");
+      const status = err.response?.status;
+      const msg = err.response?.data || err.message;
+  
+      console.error("❌ Error TTS (ElevenLabs):", msg);
+      res.status(status || 500).send("Error generando voz con ElevenLabs");
     }
-
-  } else {
-    res.status(400).send("Modelo de voz no reconocido");
   }
-});
 
 // 📡 Suscribirse a eventos EventSub
 async function subscribeToEventSub() {
