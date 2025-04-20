@@ -145,43 +145,7 @@ app.get("/api/last-message", (req, res) => {
 app.post("/api/tts", async (req, res) => {
   const { username, voice, message } = req.body;
 
-  lastTTSMessage = `${username}: ${message}`;
-  broadcastOverlayMessage(lastTTSMessage);
-
-  if (voice.startsWith("TM:")) {
-    try {
-      const gen = await axios.post("https://api.fakeyou.com/tts/inference", {
-        tts_model_token: voice,
-        inference_text: message,
-        uuid_idempotency_token: uuidv4()
-      });
-
-      const jobToken = gen.data.inference_job_token;
-      let audioUrl = null;
-      for (let i = 0; i < 20; i++) {
-        await new Promise(r => setTimeout(r, 3000));
-        const status = await axios.get(`https://api.fakeyou.com/tts/job/${jobToken}`);
-        if (status.data.state.status === "complete_success") {
-          audioUrl = status.data.state.maybe_public_bucket_wav_audio_path;
-          break;
-        }
-      }
-
-      if (audioUrl) {
-        const audioStream = await axios.get("https://storage.googleapis.com" + audioUrl, {
-          responseType: "stream"
-        });
-        res.setHeader("Content-Type", "audio/wav");
-        return audioStream.data.pipe(res);
-      } else {
-        return res.status(408).send("Tiempo de espera agotado.");
-      }
-    } catch (err) {
-      console.error("❌ Error TTS (FakeYou):", err.response?.data || err.message);
-      res.status(500).send("Error generando voz con FakeYou");
-    }
-
-  } else if (voice.startsWith("EL:")) {
+  if (voice.startsWith("EL:")) {
     try {
       const response = await axios({
         method: "POST",
@@ -192,27 +156,39 @@ app.post("/api/tts", async (req, res) => {
         },
         data: {
           text: message,
-          model_id: "eleven_multilingual_v2", // ✅ Este es el motor multilingüe correcto
+          model_id: "eleven_multilingual_v2",
           voice_settings: {
             stability: 0.5,
             similarity_boost: 0.75
           }
         },
-        responseType: "stream"
+        responseType: "arraybuffer"
       });
 
+      const audioBuffer = Buffer.from(response.data);
+      const audioBase64 = audioBuffer.toString("base64");
+      const audioUrl = `data:audio/mpeg;base64,${audioBase64}`;
+
+      const payload = {
+        text: `${username}: ${message}`,
+        audioUrl
+      };
+
+      broadcastOverlayMessage(JSON.stringify(payload));
       res.setHeader("Content-Type", "audio/mpeg");
-      response.data.pipe(res);
+      res.send(audioBuffer);
     } catch (err) {
       const status = err.response?.status;
       const msg = err.response?.data || err.message;
       console.error("❌ Error TTS (ElevenLabs):", msg);
       res.status(status || 500).send(msg);
     }
+
   } else {
-    res.status(400).send("Modelo de voz no reconocido");
+    res.status(400).send("Modelo de voz no reconocido o aún no implementado para audio en overlay");
   }
 });
+
 
 // 🔔 Suscribirse a eventos de Twitch
 async function subscribeToEventSub() {
