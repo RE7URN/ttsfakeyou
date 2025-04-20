@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
-const { v4: uuidv4 } = require("uuid"); // ✅ NUEVO
+const { v4: uuidv4 } = require("uuid");
 const app = express();
 
 const {
@@ -9,7 +9,8 @@ const {
   TWITCH_CLIENT_SECRET,
   TWITCH_CALLBACK_URL,
   TWITCH_REWARD_NAME,
-  APP_ACCESS_TOKEN
+  APP_ACCESS_TOKEN,
+  ELEVENLABS_API_KEY // ✅ asegúrate de tenerlo en el .env
 } = process.env;
 
 let userToken = "";
@@ -30,11 +31,7 @@ app.use((req, res, next) => {
   }
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-  if (req.method === "OPTIONS") {
-    return res.status(204).end();
-  }
-
+  if (req.method === "OPTIONS") return res.status(204).end();
   next();
 });
 
@@ -83,7 +80,6 @@ app.get("/twitch/callback", async (req, res) => {
     });
 
     userId = userRes.data.data[0].id;
-
     console.log("✅ Token de Twitch recibido");
     await subscribeToEventSub();
     res.send("✅ Token de Twitch recibido. Ya puedes cerrar esta pestaña.");
@@ -96,22 +92,17 @@ app.get("/twitch/callback", async (req, res) => {
 // 📬 Webhook EventSub
 app.post("/twitch/callback", async (req, res) => {
   const type = req.header("Twitch-Eventsub-Message-Type");
-
   if (type === "webhook_callback_verification") {
     return res.status(200).send(req.body.challenge);
   }
-
   if (type === "notification") {
     const event = req.body.event;
-
     if (event.reward.title === TWITCH_REWARD_NAME) {
       console.log(`🎁 ${event.user_name} canjeó: ${event.reward.title}`);
       allowedUsers.add(event.user_name.toLowerCase());
     }
-
     return res.status(200).end();
   }
-
   return res.status(200).end();
 });
 
@@ -133,8 +124,7 @@ app.post("/api/consume/:username", (req, res) => {
   }
 });
 
-// 🔊 TTS con FakeYou (corregido)
-// 🔊 Ruta unificada TTS (FakeYou o ElevenLabs según el prefijo del modelo)
+// 🔊 TTS unificado: FakeYou y ElevenLabs
 app.post("/api/tts", async (req, res) => {
   const { voice, message } = req.body;
 
@@ -180,7 +170,7 @@ app.post("/api/tts", async (req, res) => {
         method: "POST",
         url: `https://api.elevenlabs.io/v1/text-to-speech/${voice.replace("EL:", "")}`,
         headers: {
-          "xi-api-key": process.env.ELEVENLABS_API_KEY,
+          "xi-api-key": ELEVENLABS_API_KEY,
           "Content-Type": "application/json"
         },
         data: {
@@ -200,13 +190,13 @@ app.post("/api/tts", async (req, res) => {
       console.error("❌ Error TTS (ElevenLabs):", err.response?.data || err.message);
       res.status(500).send("Error generando voz con ElevenLabs");
     }
+
   } else {
     res.status(400).send("Modelo de voz no reconocido");
   }
 });
 
-
-// 📡 Suscripción a eventos EventSub
+// 📡 Suscribirse a eventos EventSub
 async function subscribeToEventSub() {
   try {
     await axios.post("https://api.twitch.tv/helix/eventsub/subscriptions", {
