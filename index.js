@@ -16,6 +16,7 @@ const {
 let userToken = "";
 let userId = "";
 let allowedUsers = new Set();
+let lastTTSMessage = ""; // ✅ NUEVO
 
 const allowedOrigins = [
   "https://ttsjoanmiii.vercel.app",
@@ -35,12 +36,9 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf } }));
-
 allowedUsers.add("joanmiii");
 
-app.get("/", (req, res) => {
-  res.send("TTS Backend is running!");
-});
+app.get("/", (req, res) => res.send("TTS Backend is running!"));
 
 app.get("/auth/login", (req, res) => {
   const redirectUri = TWITCH_CALLBACK_URL;
@@ -85,16 +83,14 @@ app.get("/twitch/callback", async (req, res) => {
 
 app.post("/twitch/callback", async (req, res) => {
   const type = req.header("Twitch-Eventsub-Message-Type");
-  if (type === "webhook_callback_verification") {
-    return res.status(200).send(req.body.challenge);
-  }
+  if (type === "webhook_callback_verification") return res.status(200).send(req.body.challenge);
+
   if (type === "notification") {
     const event = req.body.event;
     if (event.reward.title === TWITCH_REWARD_NAME) {
       console.log(`🎁 ${event.user_name} canjeó: ${event.reward.title}`);
       allowedUsers.add(event.user_name.toLowerCase());
     }
-    return res.status(200).end();
   }
   return res.status(200).end();
 });
@@ -115,8 +111,16 @@ app.post("/api/consume/:username", (req, res) => {
   }
 });
 
+// ✅ Endpoint para que el overlay lo consulte cada segundo
+app.get("/api/last-message", (req, res) => {
+  res.json({ message: lastTTSMessage });
+});
+
 app.post("/api/tts", async (req, res) => {
-  const { voice, message } = req.body;
+  const { username, voice, message } = req.body;
+
+  // 🟣 Guardamos mensaje para el overlay
+  lastTTSMessage = `${username}: ${message}`;
 
   if (voice.startsWith("TM:")) {
     try {
@@ -151,7 +155,6 @@ app.post("/api/tts", async (req, res) => {
       console.error("❌ Error TTS (FakeYou):", err.response?.data || err.message);
       res.status(500).send("Error generando voz con FakeYou");
     }
-
   } else if (voice.startsWith("EL:")) {
     try {
       const response = await axios({
@@ -183,37 +186,36 @@ app.post("/api/tts", async (req, res) => {
   } else {
     res.status(400).send("Modelo de voz no reconocido");
   }
-}); // 👈 ESTA llave faltaba
+});
 
-// 📡 Suscribirse a eventos EventSub
 async function subscribeToEventSub() {
-try {
-  await axios.post("https://api.twitch.tv/helix/eventsub/subscriptions", {
-    type: "channel.channel_points_custom_reward_redemption.add",
-    version: "1",
-    condition: {
-      broadcaster_user_id: userId
-    },
-    transport: {
-      method: "webhook",
-      callback: TWITCH_CALLBACK_URL,
-      secret: "joanmiiisecret"
-    }
-  }, {
-    headers: {
-      "Client-ID": TWITCH_CLIENT_ID,
-      "Authorization": `Bearer ${APP_ACCESS_TOKEN}`,
-      "Content-Type": "application/json"
-    }
-  });
+  try {
+    await axios.post("https://api.twitch.tv/helix/eventsub/subscriptions", {
+      type: "channel.channel_points_custom_reward_redemption.add",
+      version: "1",
+      condition: {
+        broadcaster_user_id: userId
+      },
+      transport: {
+        method: "webhook",
+        callback: TWITCH_CALLBACK_URL,
+        secret: "joanmiiisecret"
+      }
+    }, {
+      headers: {
+        "Client-ID": TWITCH_CLIENT_ID,
+        "Authorization": `Bearer ${APP_ACCESS_TOKEN}`,
+        "Content-Type": "application/json"
+      }
+    });
 
-  console.log("🔔 Suscripción a recompensas activada");
-} catch (err) {
-  console.error("❌ Error al suscribirse a EventSub:", err.response?.data || err.message);
-}
+    console.log("🔔 Suscripción a recompensas activada");
+  } catch (err) {
+    console.error("❌ Error al suscribirse a EventSub:", err.response?.data || err.message);
+  }
 }
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-console.log(`🟢 Servidor escuchando en http://localhost:${PORT}`);
+  console.log(`🟢 Servidor escuchando en http://localhost:${PORT}`);
 });
